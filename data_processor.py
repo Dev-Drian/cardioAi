@@ -15,7 +15,7 @@ class DataProcessor:
         df_processed = df.copy()
         
         # Si la primera fila contiene solo 'A', la eliminamos (header issue)
-        if df_processed.iloc[0, 0] == 'A':
+        if len(df_processed.columns) == 1 and str(df_processed.iloc[0, 0]).strip() == 'A':
             df_processed = df_processed.drop(df_processed.index[0])
         
         # Nombrar las columnas correctamente
@@ -24,7 +24,11 @@ class DataProcessor:
         
         if len(df_processed.columns) == 1:
             # Si los datos están en una sola columna, separarlos
-            df_processed = df_processed.iloc[:, 0].str.split(';', expand=True)
+            # Asegurar que es string y no está vacío
+            first_col = df_processed.columns[0]
+            df_processed = df_processed.dropna()  # Eliminar filas vacías
+            df_processed[first_col] = df_processed[first_col].astype(str)
+            df_processed = df_processed[first_col].str.split(';', expand=True)
         
         # Asignar nombres de columnas
         df_processed.columns = expected_columns[:len(df_processed.columns)]
@@ -33,6 +37,9 @@ class DataProcessor:
         for col in df_processed.columns:
             if col != 'id':
                 df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce')
+        
+        # Eliminar filas con muchos valores nulos
+        df_processed = df_processed.dropna(thresh=len(df_processed.columns) * 0.7)
         
         # Limpiar datos anómalos
         df_processed = self._clean_anomalies(df_processed)
