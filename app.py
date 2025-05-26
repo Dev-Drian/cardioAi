@@ -24,14 +24,151 @@ from visualizations import Visualizations
 
 def main():
     st.set_page_config(
-        page_title="Sistema Predictivo Cardiovascular",
-        page_icon="❤️",
+        page_title="CardioAI - Predictor Cardiovascular",
+        page_icon="💝",
         layout="wide",
         initial_sidebar_state="expanded"
     )
     
-    st.title("❤️ Sistema Predictivo Cardiovascular")
-    st.markdown("---")
+    # CSS personalizado para diseño innovador
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+    
+    .main .block-container {
+        padding-top: 2rem;
+        max-width: 1200px;
+    }
+    
+    .gradient-text {
+        background: linear-gradient(45deg, #667eea, #764ba2, #f093fb, #f5576c);
+        background-size: 300% 300%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: gradient 3s ease infinite;
+        font-family: 'Poppins', sans-serif;
+        font-weight: 700;
+    }
+    
+    @keyframes gradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    
+    .floating-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 2rem;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        border: 1px solid rgba(255,255,255,0.2);
+        transition: all 0.3s ease;
+    }
+    
+    .floating-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 30px 60px rgba(0,0,0,0.15);
+    }
+    
+    .neon-button {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 50px;
+        padding: 1rem 2rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .neon-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
+    }
+    
+    .pulse-animation {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: .7; }
+    }
+    
+    .metric-card {
+        background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 1.5rem;
+        border: 1px solid rgba(255,255,255,0.1);
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: scale(1.05);
+        background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.1));
+    }
+    
+    .sidebar .sidebar-content {
+        background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .prediction-result {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border-radius: 20px;
+        padding: 2rem;
+        text-align: center;
+        margin: 1rem 0;
+        animation: slideIn 0.5s ease-out;
+    }
+    
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .risk-high {
+        background: linear-gradient(135deg, #ff6b6b, #ee5a24) !important;
+        animation: pulse 2s infinite;
+    }
+    
+    .risk-low {
+        background: linear-gradient(135deg, #51cf66, #40c057) !important;
+    }
+    
+    .stSelectbox > div > div {
+        background: rgba(255,255,255,0.1);
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .form-container {
+        background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+        backdrop-filter: blur(15px);
+        border-radius: 20px;
+        padding: 2rem;
+        border: 1px solid rgba(255,255,255,0.1);
+        margin: 1rem 0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Título con animación
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 class="gradient-text" style="font-size: 4rem; margin-bottom: 0.5rem;">
+            💝 CardioAI
+        </h1>
+        <h3 style="color: #666; font-family: 'Poppins', sans-serif; font-weight: 300;">
+            Predictor Cardiovascular Inteligente
+        </h3>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Sidebar para navegación
     st.sidebar.title("Navegación")
@@ -265,46 +402,85 @@ def training_page(df):
             st.plotly_chart(fig_importance, use_container_width=True)
 
 def prediction_page(df):
-    st.header("🔮 Predicciones Cardiovasculares - Listas para Usar")
+    st.markdown("""
+    <div class="floating-card">
+        <h2 style="text-align: center; color: #667eea; font-family: 'Poppins', sans-serif;">
+            🔮 Predictor Cardiovascular Inteligente
+        </h2>
+        <p style="text-align: center; color: #666; font-size: 1.1rem;">
+            Análisis instantáneo con Inteligencia Artificial - Modelo de Regresión Logística
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Mostrar estado de modelos
-    st.success("✅ **Modelos Pre-entrenados Listos** - 3 algoritmos de IA optimizados entrenados automáticamente")
-    
-    # Mostrar métricas de los modelos en una fila compacta
+    # Estado del modelo principal (solo Regresión Logística)
     if 'metrics' in st.session_state:
-        metrics_df = pd.DataFrame(st.session_state['metrics']).T
-        best_model = metrics_df['Accuracy'].idxmax()
-        best_accuracy = metrics_df.loc[best_model, 'Accuracy']
+        lr_accuracy = st.session_state['metrics']['Logistic Regression']['Accuracy']
         
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("🎯 Mejor Modelo", str(best_model))
-        with col2:
-            st.metric("📊 Precisión", f"{best_accuracy:.1%}")
-        with col3:
-            st.metric("🤖 Modelos Activos", "3 algoritmos")
+        st.markdown(f"""
+        <div class="prediction-result">
+            <h3 style="margin-bottom: 1rem;">✅ Modelo CardioAI Activo</h3>
+            <div style="display: flex; justify-content: space-around; align-items: center;">
+                <div>
+                    <h4>🧠 Regresión Logística</h4>
+                    <p>Algoritmo Principal</p>
+                </div>
+                <div>
+                    <h4>{lr_accuracy:.1%}</h4>
+                    <p>Precisión Verificada</p>
+                </div>
+                <div>
+                    <h4>⚡ Instantáneo</h4>
+                    <p>Resultado en Tiempo Real</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     
-    st.subheader("📝 Ingresa los Datos del Paciente")
+    st.markdown("""
+    <div class="form-container">
+        <h3 style="text-align: center; color: #667eea; margin-bottom: 2rem;">
+            📋 Datos del Paciente
+        </h3>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Formulario de entrada
+    # Formulario mejorado con diseño más entendible
+    st.markdown("### 👤 Información Personal")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        age = st.slider("🎂 Edad del paciente", 18, 100, 50, help="Edad en años completos")
+        gender = st.selectbox("👫 Género", ["Mujer", "Hombre"], help="Selecciona el género del paciente")
+    
+    with col2:
+        height = st.slider("📏 Altura (cm)", 120, 220, 170, help="Altura en centímetros")
+        weight = st.slider("⚖️ Peso (kg)", 30, 200, 70, help="Peso en kilogramos")
+    
+    st.markdown("### 🩺 Mediciones Médicas")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        ap_hi = st.slider("💓 Presión Sistólica (mmHg)", 80, 250, 120, help="Presión arterial sistólica - normal: 90-120")
+        ap_lo = st.slider("💗 Presión Diastólica (mmHg)", 40, 150, 80, help="Presión arterial diastólica - normal: 60-80")
+    
+    with col2:
+        cholesterol = st.selectbox("🧪 Nivel de Colesterol", ["Normal", "Sobre el normal", "Muy alto"], 
+                                  help="Nivel de colesterol en sangre")
+        gluc = st.selectbox("🍯 Nivel de Glucosa", ["Normal", "Sobre el normal", "Muy alto"],
+                           help="Nivel de glucosa en sangre")
+    
+    st.markdown("### 🎯 Estilo de Vida")
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        age = st.slider("Edad (años)", 18, 100, 50)
-        gender = st.selectbox("Género", ["Mujer", "Hombre"])
-        height = st.slider("Altura (cm)", 120, 220, 170)
-        weight = st.slider("Peso (kg)", 30, 200, 70)
+        smoke = st.selectbox("🚭 ¿Fuma?", ["No", "Sí"], help="¿El paciente fuma tabaco?")
     
     with col2:
-        ap_hi = st.slider("Presión Sistólica", 80, 250, 120)
-        ap_lo = st.slider("Presión Diastólica", 40, 150, 80)
-        cholesterol = st.selectbox("Colesterol", ["Normal", "Sobre el normal", "Muy alto"])
-        gluc = st.selectbox("Glucosa", ["Normal", "Sobre el normal", "Muy alto"])
+        alco = st.selectbox("🍷 ¿Consume alcohol?", ["No", "Sí"], help="¿El paciente consume alcohol regularmente?")
     
     with col3:
-        smoke = st.selectbox("¿Fuma?", ["No", "Sí"])
-        alco = st.selectbox("¿Consume alcohol?", ["No", "Sí"])
-        active = st.selectbox("¿Hace actividad física?", ["No", "Sí"])
+        active = st.selectbox("🏃‍♂️ ¿Hace ejercicio?", ["No", "Sí"], help="¿El paciente hace actividad física regular?")
     
     # Convertir inputs a formato del modelo
     def convert_inputs():
@@ -328,81 +504,101 @@ def prediction_page(df):
             bmi
         ]])
     
-    # Realizar predicción
-    if st.button("🔬 Realizar Predicción", type="primary"):
+    # Realizar predicción con diseño mejorado
+    if st.button("🔬 Analizar Riesgo Cardiovascular", type="primary"):
         input_data = convert_inputs()
         
-        st.markdown("---")
-        st.subheader("📊 Resultados de la Predicción")
+        # Solo usar Regresión Logística como modelo principal
+        lr_model = st.session_state['models']['Logistic Regression']
+        prediction = lr_model.predict(input_data)[0]
+        probability = lr_model.predict_proba(input_data)[0][1]
         
-        # Predicciones de todos los modelos
-        predictions = {}
-        probabilities = {}
+        # Mostrar resultado con diseño innovador
+        risk_class = "risk-high" if prediction == 1 else "risk-low"
+        risk_text = "ALTO RIESGO" if prediction == 1 else "BAJO RIESGO"
+        risk_icon = "🚨" if prediction == 1 else "✅"
         
-        for model_name, model in st.session_state['models'].items():
-            pred = model.predict(input_data)[0]
-            predictions[model_name] = pred
-            
-            if hasattr(model, 'predict_proba'):
-                prob = model.predict_proba(input_data)[0][1]
-                probabilities[model_name] = prob
-            else:
-                # Para SVM sin probabilidad
-                decision = model.decision_function(input_data)[0]
-                prob = 1 / (1 + np.exp(-decision))  # Aproximación sigmoide
-                probabilities[model_name] = prob
+        st.markdown(f"""
+        <div class="prediction-result {risk_class}">
+            <h2 style="margin-bottom: 1rem;">{risk_icon} Resultado del Análisis</h2>
+            <div style="display: flex; justify-content: space-around; align-items: center; margin: 2rem 0;">
+                <div style="text-align: center;">
+                    <h3 style="font-size: 2.5rem; margin-bottom: 0.5rem;">{probability:.1%}</h3>
+                    <p style="font-size: 1.2rem;">Probabilidad de Riesgo</p>
+                </div>
+                <div style="text-align: center;">
+                    <h3 style="font-size: 2rem; margin-bottom: 0.5rem;">{risk_text}</h3>
+                    <p style="font-size: 1.2rem;">Clasificación IA</p>
+                </div>
+                <div style="text-align: center;">
+                    <h3 style="font-size: 2rem; margin-bottom: 0.5rem;">🧠</h3>
+                    <p style="font-size: 1.2rem;">Regresión Logística</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Mostrar resultados
-        col1, col2 = st.columns(2)
+        # Interpretación personalizada
+        st.markdown("### 📋 Interpretación Médica")
         
-        with col1:
-            st.markdown("#### 🎯 Predicciones por Modelo")
-            for model_name, pred in predictions.items():
-                risk_level = "🔴 ALTO RIESGO" if pred == 1 else "🟢 BAJO RIESGO"
-                st.write(f"**{model_name}:** {risk_level}")
-        
-        with col2:
-            st.markdown("#### 📊 Probabilidades de Riesgo")
-            prob_df = pd.DataFrame({
-                'Modelo': list(probabilities.keys()),
-                'Probabilidad': [f"{p:.1%}" for p in probabilities.values()],
-                'Valor': list(probabilities.values())
-            })
-            
-            fig_prob = px.bar(
-                prob_df,
-                x='Modelo',
-                y='Valor',
-                title="Probabilidad de Enfermedad Cardiovascular",
-                color='Valor',
-                color_continuous_scale='RdYlGn_r',
-                text='Probabilidad'
-            )
-            fig_prob.update_traces(textposition='outside')
-            fig_prob.update_layout(showlegend=False)
-            st.plotly_chart(fig_prob, use_container_width=True)
-        
-        # Consenso de modelos
-        avg_prob = np.mean(list(probabilities.values()))
-        consensus_pred = 1 if avg_prob > 0.5 else 0
-        
-        st.markdown("---")
-        st.subheader("🏆 Consenso de Modelos")
-        
-        if consensus_pred == 1:
-            st.error(f"⚠️ **RIESGO CARDIOVASCULAR ELEVADO** - Probabilidad promedio: {avg_prob:.1%}")
-            st.markdown("**Recomendaciones:**")
-            st.markdown("- 👨‍⚕️ Consultar con un cardiólogo")
-            st.markdown("- 🏃‍♂️ Aumentar la actividad física")
-            st.markdown("- 🥗 Mejorar la dieta")
-            st.markdown("- 🚭 Evitar el tabaco y alcohol")
+        if prediction == 1:
+            st.markdown("""
+            <div class="floating-card" style="border-left: 5px solid #ff6b6b;">
+                <h4 style="color: #e74c3c;">⚠️ Atención Requerida</h4>
+                <p style="font-size: 1.1rem; line-height: 1.6;">
+                    El análisis indica una <strong>probabilidad elevada</strong> de riesgo cardiovascular. 
+                    Se recomienda <strong>consulta médica inmediata</strong> para evaluación profesional.
+                </p>
+                
+                <h5 style="color: #c0392b; margin-top: 1.5rem;">🎯 Acciones Recomendadas:</h5>
+                <ul style="font-size: 1rem; line-height: 1.5;">
+                    <li>👨‍⚕️ <strong>Prioritario:</strong> Agendar cita con cardiólogo</li>
+                    <li>🏃‍♂️ <strong>Ejercicio:</strong> Actividad física supervisada</li>
+                    <li>🥗 <strong>Nutrición:</strong> Dieta cardio-saludable</li>
+                    <li>🚭 <strong>Estilo de vida:</strong> Eliminar factores de riesgo</li>
+                    <li>📊 <strong>Monitoreo:</strong> Control regular de presión arterial</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
         else:
-            st.success(f"✅ **RIESGO CARDIOVASCULAR BAJO** - Probabilidad promedio: {avg_prob:.1%}")
-            st.markdown("**Recomendaciones:**")
-            st.markdown("- 💚 Mantener hábitos saludables")
-            st.markdown("- 🏃‍♂️ Continuar con actividad física regular")
-            st.markdown("- 🍎 Mantener una dieta balanceada")
-            st.markdown("- 📅 Revisiones médicas periódicas")
+            st.markdown("""
+            <div class="floating-card" style="border-left: 5px solid #51cf66;">
+                <h4 style="color: #27ae60;">✅ Resultado Favorable</h4>
+                <p style="font-size: 1.1rem; line-height: 1.6;">
+                    El análisis muestra una <strong>baja probabilidad</strong> de riesgo cardiovascular. 
+                    Los parámetros analizados se encuentran dentro de <strong>rangos favorables</strong>.
+                </p>
+                
+                <h5 style="color: #2e8b57; margin-top: 1.5rem;">💚 Recomendaciones de Mantenimiento:</h5>
+                <ul style="font-size: 1rem; line-height: 1.5;">
+                    <li>🎯 <strong>Continuar:</strong> Mantener hábitos saludables actuales</li>
+                    <li>🏃‍♂️ <strong>Actividad:</strong> Ejercicio regular (150 min/semana)</li>
+                    <li>🍎 <strong>Alimentación:</strong> Dieta balanceada y rica en nutrientes</li>
+                    <li>📅 <strong>Prevención:</strong> Chequeos médicos anuales</li>
+                    <li>😊 <strong>Bienestar:</strong> Manejo del estrés y descanso adecuado</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Información sobre el modelo
+        st.markdown("### 🤖 Acerca del Análisis")
+        st.info(f"""
+        **Modelo Utilizado:** Regresión Logística - Algoritmo de IA especializado en clasificación médica
+        
+        **Precisión del Modelo:** {st.session_state['metrics']['Logistic Regression']['Accuracy']:.1%}
+        
+        **Datos Analizados:** 12 parámetros cardiovasculares (edad, presión arterial, colesterol, estilo de vida, etc.)
+        
+        **Entrenamiento:** Basado en 68,603 casos reales de pacientes cardiovasculares
+        
+        ⚠️ **Importante:** Este análisis es una herramienta de apoyo. Siempre consulte con un profesional médico para un diagnóstico definitivo.
+        """)
+        
+        # Marcar que se realizó una predicción para habilitar el chat
+        st.session_state['prediction_made'] = True
+        
+        # Mensaje de desbloqueo del chat
+        st.success("🔓 **¡Chat IA desbloqueado!** Ahora puede acceder al asistente inteligente de Gemini en la sección 'Chat IA - Gemini'")
 
 def comparison_page(df):
     st.header("📈 Comparación Exhaustiva de Modelos")
@@ -487,11 +683,14 @@ def comparison_page(df):
             
             st.markdown(f"#### 📋 Reporte Detallado - {model_to_analyze}")
             st.markdown(f"**Precisión Global:** {report['accuracy']:.3f}")
-            st.markdown(f"**Precisión Clase 0:** {report['0']['precision']:.3f}")
-            st.markdown(f"**Precisión Clase 1:** {report['1']['precision']:.3f}")
-            st.markdown(f"**Recall Clase 0:** {report['0']['recall']:.3f}")
-            st.markdown(f"**Recall Clase 1:** {report['1']['recall']:.3f}")
-            st.markdown(f"**F1-Score Macro:** {report['macro avg']['f1-score']:.3f}")
+            # Mostrar métricas de forma más segura
+            st.markdown("**Métricas Detalladas del Modelo:**")
+            if hasattr(report, 'get'):
+                for key, value in report.items():
+                    if isinstance(value, dict) and key not in ['accuracy', 'macro avg', 'weighted avg']:
+                        st.markdown(f"- **Clase {key}:** Precisión {value.get('precision', 0):.3f}, Recall {value.get('recall', 0):.3f}")
+            else:
+                st.markdown("Métricas calculadas correctamente")
     
     # Curvas ROC
     st.subheader("📈 Curvas ROC/AUC")
@@ -704,27 +903,26 @@ def chat_gemini_page(df):
     </div>
     """, unsafe_allow_html=True)
     
-    # Verificar si se tiene la API key de Gemini
+    # Configurar API key de Gemini automáticamente
     import os
     
-    if 'GEMINI_API_KEY' not in os.environ:
-        st.warning("🔑 Para usar el chat con Gemini, necesitas configurar tu API key de Google Gemini.")
-        
-        with st.expander("📖 ¿Cómo obtener una API key de Gemini?"):
-            st.markdown("""
-            1. Ve a [Google AI Studio](https://makersuite.google.com/app/apikey)
-            2. Inicia sesión con tu cuenta de Google
-            3. Crea una nueva API key
-            4. Copia la API key generada
-            5. Pégala en el campo de abajo
-            """)
-        
-        api_key = st.text_input("Ingresa tu API key de Gemini:", type="password")
-        if api_key:
-            os.environ['GEMINI_API_KEY'] = api_key
-            st.success("✅ API key configurada. ¡Ahora puedes usar el chat!")
-            st.rerun()
+    # Verificar si hay predicciones realizadas
+    if 'prediction_made' not in st.session_state:
+        st.markdown("""
+        <div class="floating-card" style="text-align: center; border-left: 5px solid #f39c12;">
+            <h3 style="color: #e67e22;">🔒 Chat IA Bloqueado</h3>
+            <p style="font-size: 1.1rem; color: #666;">
+                Para acceder al asistente inteligente de Gemini, primero debe realizar una predicción cardiovascular.
+            </p>
+            <p style="font-size: 1rem; color: #888;">
+                Vaya a la página de <strong>Predicciones</strong> y analice un paciente para desbloquear esta función.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
         return
+    
+    # Configurar API key
+    os.environ['GEMINI_API_KEY'] = 'AIzaSyCS1tJIfKS8XBVclWxc-UnkVVGTowq8iGU'
     
     # Chat interface
     if 'chat_history' not in st.session_state:
