@@ -9,20 +9,27 @@ from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.feature_selection import SelectKBest, f_classif
 
 class ModelTrainer:
     def __init__(self):
         self.scaler = StandardScaler()
         self.models = {}
         self.is_trained = False
+        self.feature_selector = SelectKBest(f_classif, k=8)  # Seleccionar las 8 mejores características
     
     def prepare_features(self, df):
         """
         Prepara las características y la variable objetivo
         """
-        # Seleccionar características principales
+        # Seleccionar características principales en un orden específico
         features = ['age', 'gender', 'height', 'weight', 'ap_hi', 'ap_lo', 
                    'cholesterol', 'gluc', 'smoke', 'alco', 'active', 'bmi']
+        
+        # Asegurar que todas las características existan
+        for feature in features:
+            if feature not in df.columns:
+                raise ValueError(f"Característica '{feature}' no encontrada en el dataset")
         
         X = df[features].copy()
         y = df['cardio'].copy()
@@ -36,23 +43,33 @@ class ModelTrainer:
         # Para datasets grandes, usar una muestra para entrenamiento más rápido
         if len(X_train) > 10000:
             from sklearn.model_selection import train_test_split
-            X_train_sample, _, y_train_sample, _ = train_test_split(
-                X_train, y_train, train_size=10000, random_state=42, stratify=y_train
+            X_train_sample, X_val, y_train_sample, y_val = train_test_split(
+                X_train, y_train, train_size=10000, test_size=0.2, random_state=42, stratify=y_train
             )
         else:
-            X_train_sample = X_train
-            y_train_sample = y_train
+            X_train_sample, X_val, y_train_sample, y_val = train_test_split(
+                X_train, y_train, test_size=0.2, random_state=42, stratify=y_train
+            )
         
         # Escalar características
         X_train_scaled = self.scaler.fit_transform(X_train_sample)
+        X_val_scaled = self.scaler.transform(X_val)
         X_test_scaled = self.scaler.transform(X_test)
         
-        # Solo 3 modelos principales para velocidad óptima
+        # Seleccionar mejores características
+        X_train_selected = self.feature_selector.fit_transform(X_train_scaled, y_train_sample)
+        X_val_selected = self.feature_selector.transform(X_val_scaled)
+        X_test_selected = self.feature_selector.transform(X_test_scaled)
+        
+        # Configuración de modelos con parámetros optimizados
         models_config = {
             'Logistic Regression': LogisticRegression(
-                random_state=42, 
-                max_iter=300,
-                solver='liblinear'
+                random_state=42,
+                max_iter=1000,
+                solver='liblinear',
+                C=0.1,  # Regularización más fuerte
+                penalty='l2',
+                class_weight='balanced'
             ),
             'Decision Tree': DecisionTreeClassifier(
                 random_state=42,
@@ -62,11 +79,12 @@ class ModelTrainer:
             ),
             'Random Forest': RandomForestClassifier(
                 random_state=42,
-                n_estimators=30,  # Reducido para velocidad máxima
+                n_estimators=100,
                 max_depth=10,
                 min_samples_split=50,
                 min_samples_leaf=20,
-                n_jobs=-1  # Usar todos los cores disponibles
+                class_weight='balanced',
+                n_jobs=-1
             )
         }
         
@@ -76,15 +94,16 @@ class ModelTrainer:
         for name, model in models_config.items():
             # Entrenar modelo
             if name == 'Logistic Regression':
-                model.fit(X_train_scaled, y_train_sample)
-                y_pred = model.predict(X_test_scaled)
-                # Validación cruzada simplificada
-                cv_scores = cross_val_score(model, X_train_scaled, y_train_sample, cv=3, scoring='accuracy')
+                model.fit(X_train_selected, y_train_sample)
+                y_pred = model.predict(X_test_selected)
+                # Validación cruzada más robusta
+                cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+                cv_scores = cross_val_score(model, X_train_selected, y_train_sample, cv=cv, scoring='accuracy')
             else:
                 model.fit(X_train_sample, y_train_sample)
                 y_pred = model.predict(X_test)
-                # Validación cruzada simplificada
-                cv_scores = cross_val_score(model, X_train_sample, y_train_sample, cv=3, scoring='accuracy')
+                cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+                cv_scores = cross_val_score(model, X_train_sample, y_train_sample, cv=cv, scoring='accuracy')
             
             # Calcular métricas
             accuracy = accuracy_score(y_test, y_pred)
@@ -120,20 +139,16 @@ class ModelTrainer:
         
         model = self.models[model_name]
         
-        # Escalar si es necesario
-        if model_name in ['SVM', 'K-Nearest Neighbors', 'Naive Bayes', 'Logistic Regression']:
-            features_scaled = self.scaler.transform(features.reshape(1, -1))
-            prediction = model.predict(features_scaled)[0]
-            if hasattr(model, 'predict_proba'):
-                probability = model.predict_proba(features_scaled)[0][1]
-            else:
-                probability = None
+        # Escalar y seleccionar características
+        features_scaled = self.scaler.transform(features.reshape(1, -1))
+        features_selected = self.feature_selector.transform(features_scaled)
+        
+        # Realizar predicción
+        prediction = model.predict(features_selected)[0]
+        if hasattr(model, 'predict_proba'):
+            probability = model.predict_proba(features_selected)[0][1]
         else:
-            prediction = model.predict(features.reshape(1, -1))[0]
-            if hasattr(model, 'predict_proba'):
-                probability = model.predict_proba(features.reshape(1, -1))[0][1]
-            else:
-                probability = None
+            probability = None
         
         return prediction, probability
     

@@ -18,6 +18,23 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 import warnings
 warnings.filterwarnings('ignore')
 
+import google.generativeai as genai
+
+
+import os
+
+# Cargar variables de entorno
+
+
+# Configurar Gemini
+GOOGLE_API_KEY = "AIzaSyCS1tJIfKS8XBVclWxc-UnkVVGTowq8iGU"
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    st.error("⚠️ No se encontró la API key de Google. Por favor, configura tu API key en el archivo .env")
+    model = None
+
 from data_processor import DataProcessor
 from model_trainer import ModelTrainer
 from visualizations import Visualizations
@@ -215,6 +232,7 @@ def main():
             results = trainer.train_all_models(X_train, X_test, y_train, y_test)
             
             # Guardar en session state
+            st.session_state['trainer'] = trainer  # Guardar el trainer completo
             st.session_state['models'] = results['models']
             st.session_state['metrics'] = results['metrics']
             st.session_state['X_test'] = X_test
@@ -346,7 +364,35 @@ def training_page(df):
         metrics_df = metrics_df.round(4)
         metrics_df = metrics_df.sort_values('Accuracy', ascending=False)
         
-        st.dataframe(metrics_df, use_container_width=True)
+        # Colorear la tabla según el rendimiento
+        def color_metrics(val):
+            if val >= 0.9:
+                return 'background-color: #d4edda; color: #155724;'
+            elif val >= 0.8:
+                return 'background-color: #fff3cd; color: #856404;'
+            else:
+                return 'background-color: #f8d7da; color: #721c24;'
+        
+        styled_df = metrics_df.style.applymap(color_metrics).set_properties(**{
+            'padding': '10px',
+            'border': '1px solid #dee2e6',
+            'text-align': 'center',
+            'font-weight': 'bold'
+        }).set_table_styles([
+            {'selector': 'th',
+             'props': [('background-color', '#f8f9fa'),
+                       ('color', '#212529'),
+                       ('font-weight', 'bold'),
+                       ('text-align', 'center'),
+                       ('padding', '12px'),
+                       ('border', '1px solid #dee2e6')]},
+            {'selector': 'td',
+             'props': [('padding', '10px'),
+                       ('border', '1px solid #dee2e6')]},
+            {'selector': 'tr:hover',
+             'props': [('background-color', '#f5f5f5')]}
+        ])
+        st.dataframe(styled_df, use_container_width=True)
         
         # Modelo destacado
         best_model = metrics_df.index[0]
@@ -357,25 +403,58 @@ def training_page(df):
         # Análisis detallado del mejor modelo
         st.subheader(f"🔍 Análisis Detallado: {best_model}")
         
-        if best_model == 'Random Forest':
-            # Feature importance para Random Forest
+        if best_model == 'Logistic Regression':
+            # Mostrar coeficientes del modelo
             model = st.session_state['models'][best_model]
             feature_importance = pd.DataFrame({
                 'Feature': st.session_state['feature_names'],
-                'Importance': model.feature_importances_
-            }).sort_values('Importance', ascending=False)
+                'Coefficient': np.abs(model.coef_[0])
+            }).sort_values('Coefficient', ascending=False)
             
             fig_importance = px.bar(
-                feature_importance.head(10),
-                x='Importance',
+                feature_importance,
+                x='Coefficient',
                 y='Feature',
                 orientation='h',
-                title=f"Top 10 Características Más Importantes - {best_model}",
-                color='Importance',
+                title=f"Importancia de Características - {best_model}",
+                color='Coefficient',
                 color_continuous_scale='Viridis'
             )
             fig_importance.update_layout(yaxis={'categoryorder': 'total ascending'})
             st.plotly_chart(fig_importance, use_container_width=True)
+            
+            # Mostrar métricas de validación cruzada
+            st.markdown("### 📊 Métricas de Validación Cruzada")
+            cv_mean = metrics_df.loc[best_model, 'CV_Mean']
+            cv_std = metrics_df.loc[best_model, 'CV_Std']
+            st.info(f"""
+            - **Media de Validación Cruzada:** {cv_mean:.3f}
+            - **Desviación Estándar:** {cv_std:.3f}
+            - **Rango de Confianza:** [{cv_mean - 2*cv_std:.3f}, {cv_mean + 2*cv_std:.3f}]
+            """)
+            
+            # Mostrar matriz de confusión
+            st.markdown("### 🎯 Matriz de Confusión")
+            y_pred = model.predict(st.session_state['X_test'])
+            cm = confusion_matrix(st.session_state['y_test'], y_pred)
+            
+            fig_cm = px.imshow(
+                cm,
+                text_auto=True,
+                aspect="auto",
+                title=f"Matriz de Confusión - {best_model}",
+                labels=dict(x="Predicho", y="Real"),
+                x=['Sin Riesgo', 'Con Riesgo'],
+                y=['Sin Riesgo', 'Con Riesgo'],
+                color_continuous_scale='Blues'
+            )
+            st.plotly_chart(fig_cm, use_container_width=True)
+            
+            # Mostrar reporte de clasificación
+            st.markdown("### 📋 Reporte de Clasificación")
+            report = classification_report(st.session_state['y_test'], y_pred, output_dict=True)
+            report_df = pd.DataFrame(report).transpose()
+            st.dataframe(report_df, use_container_width=True)
         
         elif best_model == 'Decision Tree':
             # Información del árbol de decisión
@@ -495,23 +574,48 @@ def prediction_page(df):
         chol_map = {"Normal": 1, "Sobre el normal": 2, "Muy alto": 3}
         gluc_map = {"Normal": 1, "Sobre el normal": 2, "Muy alto": 3}
         
+        # Crear array en el orden correcto de características
         return np.array([[
-            age_days, gender_num, height, weight, ap_hi, ap_lo,
-            chol_map[cholesterol], gluc_map[gluc],
-            1 if smoke == "Sí" else 0,
-            1 if alco == "Sí" else 0,
-            1 if active == "Sí" else 0,
-            bmi
-        ]])
+            age_days,      # age
+            gender_num,    # gender
+            height,        # height
+            weight,        # weight
+            ap_hi,         # ap_hi
+            ap_lo,         # ap_lo
+            chol_map[cholesterol],  # cholesterol
+            gluc_map[gluc],         # gluc
+            1 if smoke == "Sí" else 0,    # smoke
+            1 if alco == "Sí" else 0,     # alco
+            1 if active == "Sí" else 0,   # active
+            bmi            # bmi
+        ]]), bmi  # Retornar también el bmi calculado
     
     # Realizar predicción con diseño mejorado
     if st.button("🔬 Analizar Riesgo Cardiovascular", type="primary"):
-        input_data = convert_inputs()
+        input_data, bmi = convert_inputs()  # Capturar el bmi retornado
         
-        # Solo usar Regresión Logística como modelo principal
-        lr_model = st.session_state['models']['Logistic Regression']
-        prediction = lr_model.predict(input_data)[0]
-        probability = lr_model.predict_proba(input_data)[0][1]
+        # Usar el trainer guardado en session state
+        trainer = st.session_state['trainer']
+        prediction, probability = trainer.predict_single('Logistic Regression', input_data)
+        
+        # Guardar datos del usuario en session_state
+        st.session_state['user_data'] = {
+            'age': age,
+            'gender': gender,
+            'height': height,
+            'weight': weight,
+            'bmi': bmi,
+            'ap_hi': ap_hi,
+            'ap_lo': ap_lo,
+            'cholesterol': cholesterol,
+            'gluc': gluc,
+            'smoke': smoke,
+            'alco': alco,
+            'active': active,
+            'prediction': prediction,
+            'probability': probability,
+            'risk_level': 'Alto' if prediction == 1 else 'Bajo'
+        }
         
         # Mostrar resultado con diseño innovador
         risk_class = "risk-high" if prediction == 1 else "risk-low"
@@ -542,13 +646,26 @@ def prediction_page(df):
         st.markdown("### 📋 Interpretación Médica")
         
         if prediction == 1:
-            st.markdown("""
+            st.markdown(f"""
             <div class="floating-card" style="border-left: 5px solid #ff6b6b;">
                 <h4 style="color: #e74c3c;">⚠️ Atención Requerida</h4>
                 <p style="font-size: 1.1rem; line-height: 1.6;">
-                    El análisis indica una <strong>probabilidad elevada</strong> de riesgo cardiovascular. 
+                    El análisis indica una <strong>probabilidad elevada</strong> de riesgo cardiovascular ({probability:.1%}). 
                     Se recomienda <strong>consulta médica inmediata</strong> para evaluación profesional.
                 </p>
+                
+                <h5 style="color: #c0392b; margin-top: 1.5rem;">🎯 Factores de Riesgo Identificados:</h5>
+                <ul style="font-size: 1rem; line-height: 1.5;">
+                    {chr(10).join([f"<li>🔴 <strong>{factor}:</strong> {value}</li>" for factor, value in [
+                        ("Presión Arterial", f"{ap_hi}/{ap_lo} mmHg"),
+                        ("Colesterol", cholesterol),
+                        ("Glucosa", gluc),
+                        ("IMC", f"{bmi:.1f}"),
+                        ("Tabaquismo", "Sí" if smoke == "Sí" else "No"),
+                        ("Alcohol", "Sí" if alco == "Sí" else "No"),
+                        ("Actividad Física", "No" if active == "No" else "Sí")
+                    ]])}
+                </ul>
                 
                 <h5 style="color: #c0392b; margin-top: 1.5rem;">🎯 Acciones Recomendadas:</h5>
                 <ul style="font-size: 1rem; line-height: 1.5;">
@@ -561,13 +678,26 @@ def prediction_page(df):
             </div>
             """, unsafe_allow_html=True)
         else:
-            st.markdown("""
+            st.markdown(f"""
             <div class="floating-card" style="border-left: 5px solid #51cf66;">
                 <h4 style="color: #27ae60;">✅ Resultado Favorable</h4>
                 <p style="font-size: 1.1rem; line-height: 1.6;">
-                    El análisis muestra una <strong>baja probabilidad</strong> de riesgo cardiovascular. 
+                    El análisis muestra una <strong>baja probabilidad</strong> de riesgo cardiovascular ({probability:.1%}). 
                     Los parámetros analizados se encuentran dentro de <strong>rangos favorables</strong>.
                 </p>
+                
+                <h5 style="color: #2e8b57; margin-top: 1.5rem;">💚 Estado Actual:</h5>
+                <ul style="font-size: 1rem; line-height: 1.5;">
+                    {chr(10).join([f"<li>✅ <strong>{factor}:</strong> {value}</li>" for factor, value in [
+                        ("Presión Arterial", f"{ap_hi}/{ap_lo} mmHg"),
+                        ("Colesterol", cholesterol),
+                        ("Glucosa", gluc),
+                        ("IMC", f"{bmi:.1f}"),
+                        ("Tabaquismo", "No" if smoke == "No" else "Sí"),
+                        ("Alcohol", "No" if alco == "No" else "Sí"),
+                        ("Actividad Física", "Sí" if active == "Sí" else "No")
+                    ]])}
+                </ul>
                 
                 <h5 style="color: #2e8b57; margin-top: 1.5rem;">💚 Recomendaciones de Mantenimiento:</h5>
                 <ul style="font-size: 1rem; line-height: 1.5;">
@@ -617,13 +747,31 @@ def comparison_page(df):
     # Colorear la tabla
     def color_metrics(val):
         if val >= 0.9:
-            return 'background-color: #d4edda'
+            return 'background-color: #d4edda; color: #155724;'
         elif val >= 0.8:
-            return 'background-color: #fff3cd'
+            return 'background-color: #fff3cd; color: #856404;'
         else:
-            return 'background-color: #f8d7da'
+            return 'background-color: #f8d7da; color: #721c24;'
     
-    styled_df = metrics_df.style.applymap(color_metrics)
+    styled_df = metrics_df.style.applymap(color_metrics).set_properties(**{
+        'padding': '10px',
+        'border': '1px solid #dee2e6',
+        'text-align': 'center',
+        'font-weight': 'bold'
+    }).set_table_styles([
+        {'selector': 'th',
+         'props': [('background-color', '#f8f9fa'),
+                   ('color', '#212529'),
+                   ('font-weight', 'bold'),
+                   ('text-align', 'center'),
+                   ('padding', '12px'),
+                   ('border', '1px solid #dee2e6')]},
+        {'selector': 'td',
+         'props': [('padding', '10px'),
+                   ('border', '1px solid #dee2e6')]},
+        {'selector': 'tr:hover',
+         'props': [('background-color', '#f5f5f5')]}
+    ])
     st.dataframe(styled_df, use_container_width=True)
     
     # Gráfico de barras comparativo
@@ -656,8 +804,14 @@ def comparison_page(df):
     model_to_analyze = st.selectbox("Selecciona un modelo para análisis detallado:", list(st.session_state['models'].keys()))
     
     if model_to_analyze:
-        model = st.session_state['models'][model_to_analyze]
-        y_pred = model.predict(st.session_state['X_test'])
+        trainer = st.session_state['trainer']
+        X_test_scaled = trainer.scaler.transform(st.session_state['X_test'])
+        X_test_selected = trainer.feature_selector.transform(X_test_scaled)
+        
+        if model_to_analyze == 'Logistic Regression':
+            y_pred = trainer.models[model_to_analyze].predict(X_test_selected)
+        else:
+            y_pred = trainer.models[model_to_analyze].predict(st.session_state['X_test'])
         
         # Matriz de confusión
         cm = confusion_matrix(st.session_state['y_test'], y_pred)
@@ -683,14 +837,10 @@ def comparison_page(df):
             
             st.markdown(f"#### 📋 Reporte Detallado - {model_to_analyze}")
             st.markdown(f"**Precisión Global:** {report['accuracy']:.3f}")
-            # Mostrar métricas de forma más segura
             st.markdown("**Métricas Detalladas del Modelo:**")
-            if hasattr(report, 'get'):
-                for key, value in report.items():
-                    if isinstance(value, dict) and key not in ['accuracy', 'macro avg', 'weighted avg']:
-                        st.markdown(f"- **Clase {key}:** Precisión {value.get('precision', 0):.3f}, Recall {value.get('recall', 0):.3f}")
-            else:
-                st.markdown("Métricas calculadas correctamente")
+            for key, value in report.items():
+                if isinstance(value, dict) and key not in ['accuracy', 'macro avg', 'weighted avg']:
+                    st.markdown(f"- **Clase {key}:** Precisión {value.get('precision', 0):.3f}, Recall {value.get('recall', 0):.3f}")
     
     # Curvas ROC
     st.subheader("📈 Curvas ROC/AUC")
@@ -699,10 +849,16 @@ def comparison_page(df):
     
     for model_name, model in st.session_state['models'].items():
         if hasattr(model, 'predict_proba'):
-            y_prob = model.predict_proba(st.session_state['X_test'])[:, 1]
+            if model_name == 'Logistic Regression':
+                y_prob = model.predict_proba(X_test_selected)[:, 1]
+            else:
+                y_prob = model.predict_proba(st.session_state['X_test'])[:, 1]
         else:
             # Para SVM
-            y_prob = model.decision_function(st.session_state['X_test'])
+            if model_name == 'Logistic Regression':
+                y_prob = model.decision_function(X_test_selected)
+            else:
+                y_prob = model.decision_function(st.session_state['X_test'])
         
         fpr, tpr, _ = roc_curve(st.session_state['y_test'], y_prob)
         auc_score = auc(fpr, tpr)
@@ -893,18 +1049,41 @@ def chat_gemini_page(df):
     """
     st.header("🤖 Chat IA - Asistente Cardiovascular con Gemini")
     
+    # Verificar si Gemini está configurado
+    if model is None:
+        st.error("""
+        ⚠️ El modelo Gemini no está configurado correctamente.
+        
+        Para usar el chat, necesitas:
+        1. Crear un archivo `.env` en la raíz del proyecto
+        2. Agregar tu API key de Google: `GOOGLE_API_KEY=tu_api_key_aquí`
+        3. Reiniciar la aplicación
+        """)
+        return
+    
     st.markdown("""
     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                 padding: 2rem; border-radius: 15px; margin-bottom: 2rem;">
         <h3 style="color: white; margin-bottom: 1rem;">🧠 Asistente Inteligente Cardiovascular</h3>
         <p style="color: white; font-size: 1.1rem;">
-            Chatea con Gemini IA para obtener insights, análisis y recomendaciones sobre salud cardiovascular
+            Chatea con Gemini IA para obtener análisis y recomendaciones personalizadas sobre tu salud cardiovascular
         </p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Configurar API key de Gemini automáticamente
-    import os
+    # Explicación del funcionamiento del sistema
+    st.markdown("""
+    <div class="floating-card" style="margin-bottom: 2rem;">
+        <h4 style="color: #667eea;">📋 Cómo funciona el sistema:</h4>
+        <ol style="font-size: 1rem; line-height: 1.6;">
+            <li>📊 <strong>Recolección de datos:</strong> Ingresa tus datos personales y médicos en la página de predicciones</li>
+            <li>🤖 <strong>Análisis IA:</strong> El sistema procesa tus datos usando algoritmos de machine learning</li>
+            <li>🎯 <strong>Predicción:</strong> Se calcula tu riesgo cardiovascular y probabilidad</li>
+            <li>💡 <strong>Recomendaciones:</strong> Recibe consejos personalizados basados en tus resultados</li>
+            <li>💬 <strong>Chat IA:</strong> Consulta dudas específicas sobre tu salud cardiovascular</li>
+        </ol>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Verificar si hay predicciones realizadas
     if 'prediction_made' not in st.session_state:
@@ -921,169 +1100,143 @@ def chat_gemini_page(df):
         """, unsafe_allow_html=True)
         return
     
-    # Configurar API key
-    os.environ['GEMINI_API_KEY'] = 'AIzaSyCS1tJIfKS8XBVclWxc-UnkVVGTowq8iGU'
-    
     # Chat interface
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
     
-    # Preparar contexto con estadísticas del dataset
-    dataset_context = f"""
-    Contexto del dataset cardiovascular:
-    - Total de pacientes: {len(df):,}
-    - Pacientes con enfermedad cardiovascular: {df['cardio'].sum():,} ({df['cardio'].mean()*100:.1f}%)
-    - Edad promedio: {df['age_years'].mean():.1f} años
-    - BMI promedio: {df['bmi'].mean():.1f}
-    - Tasa de hipertensión: {df['hypertension'].mean()*100:.1f}%
-    - Prevalencia de tabaquismo: {df['smoke'].mean()*100:.1f}%
-    - Prevalencia de consumo de alcohol: {df['alco'].mean()*100:.1f}%
+    # Obtener datos del usuario de session_state
+    user_data = st.session_state.get('user_data', {})
+    if not user_data:
+        st.warning("⚠️ No hay datos de usuario disponibles. Por favor, realice una predicción primero.")
+        return
+    
+    # Preparar contexto para Gemini
+    context = f"""
+    Eres un asistente médico especializado en salud cardiovascular. 
+    Analiza los siguientes datos del paciente y proporciona recomendaciones personalizadas.
+    
+    IMPORTANTE: Formatea tu respuesta usando HTML con el siguiente estilo profesional:
+    
+    Estructura tu respuesta así:
+    <div style="background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h4 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">Análisis de Factores de Riesgo</h4>
+        <ul style="color: #34495e; line-height: 1.6;">
+            <li><strong style="color: #2980b9;">Factor 1:</strong> Explicación</li>
+            <li><strong style="color: #2980b9;">Factor 2:</strong> Explicación</li>
+        </ul>
+    </div>
+    
+    <div style="background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 20px;">
+        <h4 style="color: #2c3e50; border-bottom: 2px solid #27ae60; padding-bottom: 10px;">Recomendaciones Específicas</h4>
+        <ul style="color: #34495e; line-height: 1.6;">
+            <li><strong style="color: #27ae60;">Recomendación 1:</strong> Explicación</li>
+            <li><strong style="color: #27ae60;">Recomendación 2:</strong> Explicación</li>
+        </ul>
+    </div>
+    
+    <div style="background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 20px;">
+        <h4 style="color: #2c3e50; border-bottom: 2px solid #e67e22; padding-bottom: 10px;">Consejos Prácticos</h4>
+        <ul style="color: #34495e; line-height: 1.6;">
+            <li><strong style="color: #e67e22;">Consejo 1:</strong> Explicación</li>
+            <li><strong style="color: #e67e22;">Consejo 2:</strong> Explicación</li>
+        </ul>
+    </div>
+    
+    Usa estos colores para diferentes elementos:
+    - Títulos principales: #2c3e50 (azul oscuro)
+    - Factores de riesgo: #2980b9 (azul)
+    - Recomendaciones: #27ae60 (verde)
+    - Consejos: #e67e22 (naranja)
+    - Texto normal: #34495e (gris oscuro)
+    - Advertencias: #c0392b (rojo)
+    
+    Datos del paciente:
+    - Edad: {user_data.get('age', 'N/A')} años
+    - Género: {user_data.get('gender', 'N/A')}
+    - Altura: {user_data.get('height', 'N/A')} cm
+    - Peso: {user_data.get('weight', 'N/A')} kg
+    - IMC: {user_data.get('bmi', 'N/A'):.1f}
+    - Presión Arterial: {user_data.get('ap_hi', 'N/A')}/{user_data.get('ap_lo', 'N/A')} mmHg
+    - Colesterol: {user_data.get('cholesterol', 'N/A')}
+    - Glucosa: {user_data.get('gluc', 'N/A')}
+    - Tabaquismo: {user_data.get('smoke', 'N/A')}
+    - Alcohol: {user_data.get('alco', 'N/A')}
+    - Actividad Física: {user_data.get('active', 'N/A')}
+    - Riesgo Cardiovascular: {user_data.get('risk_level', 'N/A')} ({user_data.get('probability', 'N/A'):.1%})
     """
     
-    # Sugerencias de preguntas
+    # Sugerencias de preguntas personalizadas
     st.subheader("💡 Preguntas Sugeridas")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("📊 Análisis del dataset"):
-            user_question = "Analiza las principales estadísticas y tendencias del dataset cardiovascular"
+        if st.button("📊 Análisis de mi salud"):
+            user_question = "¿Cómo está mi salud cardiovascular según mis datos?"
             st.session_state.user_input = user_question
     
     with col2:
         if st.button("🎯 Factores de riesgo"):
-            user_question = "¿Cuáles son los principales factores de riesgo cardiovascular según los datos?"
+            user_question = "¿Cuáles son mis principales factores de riesgo cardiovascular?"
             st.session_state.user_input = user_question
     
     with col3:
         if st.button("💊 Recomendaciones"):
-            user_question = "Dame recomendaciones para prevenir enfermedades cardiovasculares"
+            user_question = "¿Qué recomendaciones específicas me das para mejorar mi salud cardiovascular?"
             st.session_state.user_input = user_question
     
     # Input del usuario
     user_input = st.text_input(
-        "Escribe tu pregunta sobre salud cardiovascular:",
+        "Escribe tu pregunta sobre tu salud cardiovascular:",
         key="user_input_field",
         value=st.session_state.get('user_input', '')
     )
     
     if st.button("Enviar 🚀") and user_input:
-        # Simular respuesta de Gemini (ya que necesitaríamos la API real)
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         
-        # Respuesta simulada inteligente basada en el contexto
-        if "análisis" in user_input.lower() or "estadística" in user_input.lower():
+        try:
+            # Generar respuesta con Gemini
+            prompt = f"{context}\n\nPregunta del usuario: {user_input}"
+            response = model.generate_content(prompt)
+            ai_response = response.text
+            
+            # Asegurar que la respuesta tenga el formato HTML correcto
+            if not ai_response.startswith('<'):
+                ai_response = f"""
+                <div style="background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    {ai_response.replace(chr(10), '<br>')}
+                </div>
+                """
+            
+        except Exception as e:
             ai_response = f"""
-            📊 **Análisis del Dataset Cardiovascular:**
-            
-            Basado en los datos de {len(df):,} pacientes, aquí están los insights principales:
-            
-            🔍 **Prevalencia de Enfermedad:**
-            - {df['cardio'].mean()*100:.1f}% de los pacientes tienen enfermedad cardiovascular
-            - Esto representa {df['cardio'].sum():,} casos confirmados
-            
-            👥 **Demografia:**
-            - Edad promedio: {df['age_years'].mean():.1f} años
-            - Distribución por género: {(df['gender']==1).sum():,} mujeres, {(df['gender']==2).sum():,} hombres
-            
-            ⚠️ **Factores de Riesgo:**
-            - Hipertensión: {df['hypertension'].mean()*100:.1f}% de los pacientes
-            - Tabaquismo: {df['smoke'].mean()*100:.1f}%
-            - Consumo de alcohol: {df['alco'].mean()*100:.1f}%
-            - BMI promedio: {df['bmi'].mean():.1f}
-            
-            💡 **Recomendación:** Los datos sugieren que la hipertensión es el factor de riesgo más prevalente.
-            """
-        
-        elif "factor" in user_input.lower() and "riesgo" in user_input.lower():
-            ai_response = """
-            🎯 **Principales Factores de Riesgo Cardiovascular:**
-            
-            Según la evidencia científica y los datos analizados:
-            
-            🔴 **Factores Modificables:**
-            1. **Hipertensión arterial** - Principal factor de riesgo
-            2. **Colesterol elevado** - Afecta las arterias
-            3. **Tabaquismo** - Daña el sistema cardiovascular
-            4. **Sedentarismo** - Falta de actividad física
-            5. **Obesidad** - Sobrecarga el corazón
-            6. **Diabetes/Glucosa alta** - Daña los vasos sanguíneos
-            
-            🟡 **Factores No Modificables:**
-            - Edad (aumenta el riesgo)
-            - Género (hombres mayor riesgo temprano)
-            - Historial familiar
-            
-            💪 **¡La buena noticia!** La mayoría de factores son modificables con cambios en el estilo de vida.
-            """
-        
-        elif "recomendación" in user_input.lower() or "prevenir" in user_input.lower():
-            ai_response = """
-            💊 **Recomendaciones para Prevenir Enfermedades Cardiovasculares:**
-            
-            🏃‍♂️ **Actividad Física:**
-            - Mínimo 150 minutos de ejercicio moderado por semana
-            - Caminar, nadar, ciclismo son excelentes opciones
-            - Incluir ejercicios de fuerza 2 veces por semana
-            
-            🥗 **Alimentación Saludable:**
-            - Dieta mediterránea rica en omega-3
-            - Reducir sodio (< 2300mg/día)
-            - Aumentar frutas y verduras (5 porciones/día)
-            - Limitar grasas saturadas y trans
-            
-            🚭 **Eliminar Factores de Riesgo:**
-            - Dejar de fumar completamente
-            - Limitar alcohol (1-2 bebidas/día máximo)
-            - Mantener peso saludable (BMI 18.5-24.9)
-            
-            🩺 **Control Médico:**
-            - Monitorear presión arterial regularmente
-            - Revisar colesterol anualmente
-            - Control de glucosa si hay riesgo
-            
-            😴 **Estilo de Vida:**
-            - Dormir 7-9 horas por noche
-            - Manejar el estrés (meditación, yoga)
-            - Mantener relaciones sociales saludables
-            """
-        
-        else:
-            ai_response = f"""
-            🤖 **Respuesta del Asistente IA:**
-            
-            He analizado tu consulta sobre salud cardiovascular. Basándome en los datos de {len(df):,} pacientes:
-            
-            📋 **Información relevante:**
-            {dataset_context}
-            
-            💡 **Sugerencia:** Para obtener respuestas más específicas, prueba preguntar sobre:
-            - Análisis de factores de riesgo específicos
-            - Recomendaciones de prevención
-            - Interpretación de métricas cardiovasculares
-            - Comparación entre grupos de pacientes
-            
-            ¿Te gustaría explorar alguno de estos temas en particular?
+            <div style="background-color: #fdf2f2; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h4 style="color: #c0392b; border-bottom: 2px solid #c0392b; padding-bottom: 10px;">⚠️ Error</h4>
+                <p style="color: #34495e;">Lo siento, hubo un error al procesar tu pregunta. Por favor, intenta de nuevo.</p>
+                <p style="color: #c0392b; font-size: 0.9em;">Error: {str(e)}</p>
+            </div>
             """
         
         st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
         st.session_state.user_input = ""
     
-    # Mostrar historial de chat
+    # Mostrar historial de chat con mejor formato
     if st.session_state.chat_history:
         st.subheader("💬 Conversación")
         
         for i, message in enumerate(st.session_state.chat_history):
             if message["role"] == "user":
                 st.markdown(f"""
-                <div style="background-color: #e1f5fe; padding: 1rem; border-radius: 10px; margin: 0.5rem 0;">
-                    <strong>👤 Tú:</strong> {message['content']}
+                <div style="background-color: #f0f7ff; padding: 1.5rem; border-radius: 15px; margin: 1rem 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <strong style="color: #2980b9;">👤 Tú:</strong><br>
+                    <p style="margin: 0.5rem 0 0 0; color: #2c3e50;">{message['content']}</p>
                 </div>
                 """, unsafe_allow_html=True)
             else:
                 st.markdown(f"""
-                <div style="background-color: #f3e5f5; padding: 1rem; border-radius: 10px; margin: 0.5rem 0;">
-                    <strong>🤖 Gemini IA:</strong><br>
+                <div style="background-color: #ffffff; padding: 1.5rem; border-radius: 15px; margin: 1rem 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <strong style="color: #2c3e50;">🤖 Gemini IA:</strong><br>
                     {message['content']}
                 </div>
                 """, unsafe_allow_html=True)
