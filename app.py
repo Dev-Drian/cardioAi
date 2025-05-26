@@ -37,7 +37,7 @@ def main():
     st.sidebar.title("Navegación")
     page = st.sidebar.selectbox(
         "Selecciona una página:",
-        ["🏠 Inicio", "📊 Exploración de Datos", "🤖 Entrenamiento de Modelos", "🔮 Predicciones", "📈 Comparación de Modelos", "🤖 Chat IA - Gemini"]
+        ["🏠 Inicio", "📊 Exploración de Datos", "🔮 Predicciones", "📈 Comparación de Modelos", "🤖 Chat IA - Gemini"]
     )
     
     # Cargar datos
@@ -69,13 +69,30 @@ def main():
     st.sidebar.info(f"**Características:** {len(df.columns)-1}")
     st.sidebar.info(f"**Casos positivos:** {df['cardio'].sum():,} ({df['cardio'].mean()*100:.1f}%)")
     
+    # Entrenar modelos automáticamente una vez
+    @st.cache_resource
+    def initialize_models(df):
+        trainer = ModelTrainer()
+        X, y = trainer.prepare_features(df)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+        results = trainer.train_all_models(X_train, X_test, y_train, y_test)
+        return results, X_test, y_test, X.columns.tolist()
+    
+    # Inicializar modelos automáticamente
+    models_data, X_test, y_test, feature_names = initialize_models(df)
+    
+    # Guardar en session state para acceso global
+    st.session_state['models'] = models_data['models']
+    st.session_state['metrics'] = models_data['metrics']
+    st.session_state['X_test'] = X_test
+    st.session_state['y_test'] = y_test
+    st.session_state['feature_names'] = feature_names
+    
     # Navegación por páginas
     if page == "🏠 Inicio":
         landing_page(df)
     elif page == "📊 Exploración de Datos":
         exploration_page(df, processor)
-    elif page == "🤖 Entrenamiento de Modelos":
-        training_page(df)
     elif page == "🔮 Predicciones":
         prediction_page(df)
     elif page == "📈 Comparación de Modelos":
@@ -248,11 +265,24 @@ def training_page(df):
             st.plotly_chart(fig_importance, use_container_width=True)
 
 def prediction_page(df):
-    st.header("🔮 Predicciones Individuales")
+    st.header("🔮 Predicciones Cardiovasculares - Listas para Usar")
     
-    if 'models' not in st.session_state:
-        st.warning("⚠️ Primero debes entrenar los modelos en la página de 'Entrenamiento de Modelos'.")
-        return
+    # Mostrar estado de modelos
+    st.success("✅ **Modelos Pre-entrenados Listos** - 6 algoritmos de IA entrenados automáticamente")
+    
+    # Mostrar métricas de los modelos en una fila compacta
+    if 'metrics' in st.session_state:
+        metrics_df = pd.DataFrame(st.session_state['metrics']).T
+        best_model = metrics_df['Accuracy'].idxmax()
+        best_accuracy = metrics_df.loc[best_model, 'Accuracy']
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("🎯 Mejor Modelo", str(best_model))
+        with col2:
+            st.metric("📊 Precisión", f"{best_accuracy:.1%}")
+        with col3:
+            st.metric("🤖 Modelos Activos", "6 algoritmos")
     
     st.subheader("📝 Ingresa los Datos del Paciente")
     
@@ -566,12 +596,20 @@ def landing_page(df):
         )
     
     with col4:
-        accuracy_estimate = 0.73  # Estimación basada en modelos típicos
-        st.metric(
-            label="🎯 Precisión Estimada",
-            value=f"{accuracy_estimate:.1%}",
-            delta="Modelos entrenados"
-        )
+        if 'metrics' in st.session_state:
+            metrics_df = pd.DataFrame(st.session_state['metrics']).T
+            best_accuracy = metrics_df['Accuracy'].max()
+            st.metric(
+                label="🎯 Precisión Real",
+                value=f"{best_accuracy:.1%}",
+                delta="Modelos entrenados"
+            )
+        else:
+            st.metric(
+                label="🎯 Precisión Estimada",
+                value="73.0%",
+                delta="Modelos entrenados"
+            )
     
     st.markdown("---")
     
