@@ -69,24 +69,24 @@ def main():
     st.sidebar.info(f"**Características:** {len(df.columns)-1}")
     st.sidebar.info(f"**Casos positivos:** {df['cardio'].sum():,} ({df['cardio'].mean()*100:.1f}%)")
     
-    # Entrenar modelos automáticamente una vez
-    @st.cache_resource
-    def initialize_models(df):
-        trainer = ModelTrainer()
-        X, y = trainer.prepare_features(df)
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-        results = trainer.train_all_models(X_train, X_test, y_train, y_test)
-        return results, X_test, y_test, X.columns.tolist()
-    
-    # Inicializar modelos automáticamente
-    models_data, X_test, y_test, feature_names = initialize_models(df)
-    
-    # Guardar en session state para acceso global
-    st.session_state['models'] = models_data['models']
-    st.session_state['metrics'] = models_data['metrics']
-    st.session_state['X_test'] = X_test
-    st.session_state['y_test'] = y_test
-    st.session_state['feature_names'] = feature_names
+    # Inicializar modelos solo cuando sea necesario
+    if 'models_initialized' not in st.session_state:
+        with st.spinner("🤖 Inicializando modelos de IA... Por favor espera un momento"):
+            trainer = ModelTrainer()
+            X, y = trainer.prepare_features(df)
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+            results = trainer.train_all_models(X_train, X_test, y_train, y_test)
+            
+            # Guardar en session state
+            st.session_state['models'] = results['models']
+            st.session_state['metrics'] = results['metrics']
+            st.session_state['X_test'] = X_test
+            st.session_state['y_test'] = y_test
+            st.session_state['feature_names'] = X.columns.tolist()
+            st.session_state['models_initialized'] = True
+            
+        st.success("✅ ¡Modelos entrenados y listos para usar!")
+        st.rerun()
     
     # Navegación por páginas
     if page == "🏠 Inicio":
@@ -268,7 +268,7 @@ def prediction_page(df):
     st.header("🔮 Predicciones Cardiovasculares - Listas para Usar")
     
     # Mostrar estado de modelos
-    st.success("✅ **Modelos Pre-entrenados Listos** - 6 algoritmos de IA entrenados automáticamente")
+    st.success("✅ **Modelos Pre-entrenados Listos** - 3 algoritmos de IA optimizados entrenados automáticamente")
     
     # Mostrar métricas de los modelos en una fila compacta
     if 'metrics' in st.session_state:
@@ -282,7 +282,7 @@ def prediction_page(df):
         with col2:
             st.metric("📊 Precisión", f"{best_accuracy:.1%}")
         with col3:
-            st.metric("🤖 Modelos Activos", "6 algoritmos")
+            st.metric("🤖 Modelos Activos", "3 algoritmos")
     
     st.subheader("📝 Ingresa los Datos del Paciente")
     
@@ -621,7 +621,7 @@ def landing_page(df):
     with col1:
         st.markdown("""
         ### 🤖 Inteligencia Artificial Avanzada
-        - **6 Algoritmos de ML**: Logistic Regression, Decision Tree, Random Forest, SVM, KNN, Naive Bayes
+        - **3 Algoritmos Optimizados**: Logistic Regression, Decision Tree, Random Forest
         - **Validación Cruzada**: Métricas confiables y precisas
         - **Feature Engineering**: Creación automática de características relevantes
         - **Escalado Automático**: Normalización inteligente de datos

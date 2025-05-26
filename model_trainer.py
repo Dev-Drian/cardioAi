@@ -31,43 +31,43 @@ class ModelTrainer:
     
     def train_all_models(self, X_train, X_test, y_train, y_test):
         """
-        Entrena todos los modelos de machine learning
+        Entrena todos los modelos de machine learning de forma optimizada
         """
+        # Para datasets grandes, usar una muestra para entrenamiento más rápido
+        if len(X_train) > 10000:
+            from sklearn.model_selection import train_test_split
+            X_train_sample, _, y_train_sample, _ = train_test_split(
+                X_train, y_train, train_size=10000, random_state=42, stratify=y_train
+            )
+        else:
+            X_train_sample = X_train
+            y_train_sample = y_train
+        
         # Escalar características
-        X_train_scaled = self.scaler.fit_transform(X_train)
+        X_train_scaled = self.scaler.fit_transform(X_train_sample)
         X_test_scaled = self.scaler.transform(X_test)
         
-        # Definir modelos con sus parámetros optimizados
+        # Solo 3 modelos principales para velocidad óptima
         models_config = {
             'Logistic Regression': LogisticRegression(
                 random_state=42, 
-                max_iter=1000,
+                max_iter=300,
                 solver='liblinear'
             ),
             'Decision Tree': DecisionTreeClassifier(
                 random_state=42,
                 max_depth=10,
-                min_samples_split=20,
-                min_samples_leaf=10
+                min_samples_split=50,
+                min_samples_leaf=20
             ),
             'Random Forest': RandomForestClassifier(
                 random_state=42,
-                n_estimators=100,
+                n_estimators=30,  # Reducido para velocidad máxima
                 max_depth=10,
-                min_samples_split=20,
-                min_samples_leaf=10
-            ),
-            'SVM': SVC(
-                random_state=42,
-                kernel='rbf',
-                C=1.0,
-                gamma='scale'
-            ),
-            'K-Nearest Neighbors': KNeighborsClassifier(
-                n_neighbors=5,
-                weights='distance'
-            ),
-            'Naive Bayes': GaussianNB()
+                min_samples_split=50,
+                min_samples_leaf=20,
+                n_jobs=-1  # Usar todos los cores disponibles
+            )
         }
         
         trained_models = {}
@@ -75,24 +75,22 @@ class ModelTrainer:
         
         for name, model in models_config.items():
             # Entrenar modelo
-            if name in ['SVM', 'K-Nearest Neighbors', 'Naive Bayes', 'Logistic Regression']:
-                model.fit(X_train_scaled, y_train)
+            if name == 'Logistic Regression':
+                model.fit(X_train_scaled, y_train_sample)
                 y_pred = model.predict(X_test_scaled)
+                # Validación cruzada simplificada
+                cv_scores = cross_val_score(model, X_train_scaled, y_train_sample, cv=3, scoring='accuracy')
             else:
-                model.fit(X_train, y_train)
+                model.fit(X_train_sample, y_train_sample)
                 y_pred = model.predict(X_test)
+                # Validación cruzada simplificada
+                cv_scores = cross_val_score(model, X_train_sample, y_train_sample, cv=3, scoring='accuracy')
             
             # Calcular métricas
             accuracy = accuracy_score(y_test, y_pred)
             precision = precision_score(y_test, y_pred, average='weighted')
             recall = recall_score(y_test, y_pred, average='weighted')
             f1 = f1_score(y_test, y_pred, average='weighted')
-            
-            # Validación cruzada
-            if name in ['SVM', 'K-Nearest Neighbors', 'Naive Bayes', 'Logistic Regression']:
-                cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=5, scoring='accuracy')
-            else:
-                cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring='accuracy')
             
             # Almacenar resultados
             trained_models[name] = model
